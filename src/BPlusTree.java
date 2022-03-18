@@ -1,7 +1,4 @@
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -42,8 +39,8 @@ public class BPlusTree<K extends Comparable<K>, V> {
     private void breakNode(LeafNode node){
         int toLeft = maxChildren/2;
         K splitKey = node.pairs.get(toLeft).key;
-        LeafNode newRight = new LeafNode(node.pairs.subList(toLeft, node.pairs.size()), node.parent, node, node.next);
-        node.pairs = node.pairs.subList(0, toLeft);
+        LeafNode newRight = new LeafNode(new ArrayList<>(node.pairs.subList(toLeft, node.pairs.size())), node.parent, node, node.next);
+        node.pairs = new ArrayList<>(node.pairs.subList(0, toLeft));
         node.size = toLeft;
         node.next = newRight;
 
@@ -72,12 +69,12 @@ public class BPlusTree<K extends Comparable<K>, V> {
         int toLeft = maxChildren/2;
         K splitKey = node.keys.get(toLeft);
         InternalNode newRight = new InternalNode(
-                node.keys.subList(toLeft+1, node.keys.size()),
-                node.pointers.subList(toLeft+1, node.pointers.size()),
+                new ArrayList<>(node.keys.subList(toLeft+1, node.keys.size())),
+                new ArrayList<>(node.pointers.subList(toLeft+1, node.pointers.size())),
                 node.parent
         );
-        node.keys = node.keys.subList(0, toLeft);
-        node.pointers = node.pointers.subList(0, toLeft+1);
+        node.keys = new ArrayList<>(node.keys.subList(0, toLeft));
+        node.pointers = new ArrayList<>(node.pointers.subList(0, toLeft+1));
         node.size = toLeft;
 
         if (!node.equals(this.root)) {
@@ -154,11 +151,11 @@ public class BPlusTree<K extends Comparable<K>, V> {
         }
         LeafNode l = (LeafNode) c;
         while (l != null){
-            System.out.print("|| ");
+            System.out.print("| ");
             for (Pair p : l.pairs) {
-                System.out.print(p.key + "|");
+                System.out.print(p.key + ",");
             }
-            System.out.print(" ||");
+            System.out.print(" |");
             l = l.next;
         }
     }
