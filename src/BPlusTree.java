@@ -4,7 +4,7 @@ import java.util.stream.Stream;
 
 public class BPlusTree<K extends Comparable<K>, V> {
     private Node root;
-    private int maxChildren;
+    private final int maxChildren;
 
     public BPlusTree(int maxChildren) {
         this.maxChildren = maxChildren;
@@ -44,25 +44,7 @@ public class BPlusTree<K extends Comparable<K>, V> {
         node.size = toLeft;
         node.next = newRight;
 
-        if (!node.equals(this.root)) {
-            InternalNode parent = node.parent;
-
-            int pos = insertSorted(parent.keys, splitKey);
-            parent.pointers.add(pos+1, newRight);
-            parent.size++;
-
-            if (parent.size >= this.maxChildren)
-                breakNode(parent);
-        } else {
-            InternalNode newRoot = new InternalNode(
-                    Stream.of(splitKey).collect(Collectors.toList()),
-                    Stream.of(node, newRight).collect(Collectors.toList()),
-                    null
-            );
-            this.root = newRoot;
-            node.parent = newRoot;
-            newRight.parent = newRoot;
-        }
+        pushToParent(node, splitKey, newRight);
     }
 
     private void breakNode(InternalNode node){
@@ -77,6 +59,10 @@ public class BPlusTree<K extends Comparable<K>, V> {
         node.pointers = new ArrayList<>(node.pointers.subList(0, toLeft+1));
         node.size = toLeft;
 
+        pushToParent(node, splitKey, newRight);
+    }
+
+    private void pushToParent(Node node, K splitKey, Node newRight){
         if (!node.equals(this.root)) {
             InternalNode parent = node.parent;
             int pos = insertSorted(parent.keys, splitKey);
@@ -96,8 +82,6 @@ public class BPlusTree<K extends Comparable<K>, V> {
             node.parent = newRoot;
             newRight.parent = newRoot;
         }
-
-
     }
 
     private int insertSorted(List<K> list, K key){
@@ -109,14 +93,13 @@ public class BPlusTree<K extends Comparable<K>, V> {
         return index;
     }
 
-    private int insertSorted(List<Pair> list, K key, V value){
+    private void insertSorted(List<Pair> list, K key, V value){
         Pair newPair = new Pair(key, value);
         int index = Collections.binarySearch(list, newPair);
         if (index < 0) {
             index = -index - 1;
         }
         list.add(index, newPair);
-        return index;
     }
 
     private LeafNode getLeaf(K key){
@@ -164,9 +147,6 @@ public class BPlusTree<K extends Comparable<K>, V> {
     // Classes
 
     private class Pair implements Comparable<Pair> {
-        public K getKey() {
-            return key;
-        }
 
         public K key;
         public V value;

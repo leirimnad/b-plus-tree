@@ -6,6 +6,7 @@ public class BPlusTreeTest {
         tree.insert(25, "Salt food");
         tree.insert(35, "Soups");
         tree.insert(45, "Salads");
+        System.out.println(tree.get(5));
         tree.print();
     }
 }
