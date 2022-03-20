@@ -59,9 +59,9 @@ public class BPlusTree<K extends Comparable<K>, V> {
         // else merge
         else {
             if (node.hasNext() && node.next().parent.equals(node.parent))
-                merge(node, node.next());
+                merge(node, node.next(), deleting, inorderSuccessor);
             else
-                merge(node.previous(), node);
+                merge(node.previous(), node, deleting, inorderSuccessor);
         }
     }
 
@@ -234,7 +234,7 @@ public class BPlusTree<K extends Comparable<K>, V> {
             replacePropagate(node.parent, oldKey, newKey);
     }
 
-    private void merge(LeafNode smaller, LeafNode bigger){
+    private void merge(LeafNode smaller, LeafNode bigger, K leafKey, K inorderSuccessor){
         smaller.addEntries(smaller.pairs.size(), bigger.pairs);
         K deleted = bigger.parent.removeChild(bigger);
         smaller.next = bigger.next;
@@ -243,6 +243,7 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
         // fixing parent
         InternalNode parent = smaller.parent;
+        replacePropagate(smaller.parent, leafKey, inorderSuccessor);
         fixUnderfeeding(parent, deleted);
     }
 
