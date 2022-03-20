@@ -27,12 +27,71 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
         LeafNode leaf = this.getLeaf(key);
 
-        if (leaf.size < this.maxChildren-1){
-            leaf.pairs.add(new Pair(key, value));
-            leaf.size++;
-        } else {
-            insertSorted(leaf.pairs, key, value);
+        leaf.addEntry(key, value);
+
+        if (leaf.isOverfed())
             breakNode(leaf);
+
+    }
+
+    public void delete(K key){
+        LeafNode leaf = getLeaf(key);
+
+        K inorderSuccessor = leaf.inorderSuccessor(key);
+        leaf.removeEntry(key);
+
+        fixUnderfeeding(leaf, key, inorderSuccessor);
+    }
+
+    private void fixUnderfeeding(LeafNode node, K deleting, K inorderSuccessor){
+        if (!node.isUnderfed()) {
+            if (inorderSuccessor != null)
+                replacePropagate(node.parent, deleting, inorderSuccessor);
+            return;
+        }
+
+        // try to steal
+        if (node.hasNext() && node.parent.equals(node.next().parent) && node.next().hasSpareEntries())
+            stealFromNext(node, deleting);
+        else if (node.hasPrevious() && node.parent.equals(node.previous().parent) && node.previous().hasSpareEntries())
+            stealFromPrevious(node, deleting);
+
+        // else merge
+        else {
+            if (node.hasNext() && node.next().parent.equals(node.parent))
+                merge(node, node.next());
+            else
+                merge(node.previous(), node);
+        }
+    }
+
+    private void fixUnderfeeding(InternalNode node, K deleting){
+        if (!node.isUnderfed())
+            return;
+
+        if (node.equals(this.root)){
+            this.root = node.pointers.get(0);
+            this.root.parent = null;
+            return;
+        }
+
+        InternalNode next = node.next();
+        InternalNode previous = node.previous();
+
+        // try to steal
+        if (next != null && node.parent.equals(next.parent) && next.hasSpareEntries())
+            stealFromNext(node, deleting);
+        else if (previous != null && node.parent.equals(previous.parent) && previous.hasSpareEntries())
+            stealFromPrevious(node, deleting);
+
+        // else merge
+        else {
+            if (next != null)
+                merge(node, next);
+            else if (previous != null)
+                merge(previous, node);
+            else
+                throw new RuntimeException("Node has no previous and no next");
         }
     }
 
@@ -55,6 +114,8 @@ public class BPlusTree<K extends Comparable<K>, V> {
                 new ArrayList<>(node.pointers.subList(toLeft+1, node.pointers.size())),
                 node.parent
         );
+        for (Node child : newRight.pointers)
+            child.parent = newRight;
         node.keys = new ArrayList<>(node.keys.subList(0, toLeft));
         node.pointers = new ArrayList<>(node.pointers.subList(0, toLeft+1));
         node.size = toLeft;
@@ -100,6 +161,106 @@ public class BPlusTree<K extends Comparable<K>, V> {
             index = -index - 1;
         }
         list.add(index, newPair);
+    }
+
+    private void insertSorted(List<Pair> list, Pair pair){
+        int index = Collections.binarySearch(list, pair);
+        if (index < 0) {
+            index = -index - 1;
+        }
+        list.add(index, pair);
+    }
+
+    private void stealFromNext(LeafNode node, K deleting){
+        Pair toMove = node.next.removeAt(0);
+        node.addEntry(toMove);
+        replacePropagate(node.parent, deleting, toMove.key);
+        node.parent.keys.set(Collections.binarySearch(node.parent.keys, toMove.key), node.next.pairs.get(0).key);
+    }
+
+    private void stealFromNext(InternalNode node, K deleting){
+        InternalNode next = node.next();
+        if (next == null)
+            throw new IllegalArgumentException("Node has no next");
+
+        int keyNum = node.parent.childNum(node);
+        K fromParent = node.parent.keys.get(keyNum);
+
+        K stolenKey = next.keys.remove(0);
+        Node stolenChild = next.pointers.remove(0);
+        next.size--;
+
+        node.parent.keys.set(keyNum, stolenKey);
+        node.keys.add(fromParent);
+        node.pointers.add(stolenChild);
+        node.size++;
+        stolenChild.parent = node;
+
+        replacePropagate(node.parent, deleting, stolenKey);
+    }
+
+    private void stealFromPrevious(LeafNode node, K deleting){
+        Pair toMove = node.previous.removeAt(node.previous.pairs.size()-1);
+        node.addEntry(toMove);
+        replacePropagate(node.parent, deleting, toMove.key);
+    }
+
+    private void stealFromPrevious(InternalNode node, K deleting){
+        InternalNode previous = node.previous();
+        if (previous == null)
+            throw new IllegalArgumentException("Node has no previous");
+
+        int keyNum = node.parent.childNum(node)-1;
+        K fromParent = node.parent.keys.get(keyNum);
+
+        K stolenKey = previous.keys.remove(previous.size-1);
+        Node stolenChild = previous.pointers.remove(previous.size-1);
+        previous.size--;
+
+        node.parent.keys.set(keyNum, stolenKey);
+        node.keys.add(0, fromParent);
+        node.pointers.add(0, stolenChild);
+        node.size++;
+        stolenChild.parent = node;
+
+        replacePropagate(node.parent, deleting, stolenKey);
+    }
+
+    private void replacePropagate(InternalNode node, K oldKey, K newKey){
+        int index = Collections.binarySearch(node.keys, oldKey);
+        if (index >= 0)
+            node.keys.set(index, newKey);
+        if (node.parent != null)
+            replacePropagate(node.parent, oldKey, newKey);
+    }
+
+    private void merge(LeafNode smaller, LeafNode bigger){
+        smaller.addEntries(smaller.pairs.size(), bigger.pairs);
+        K deleted = bigger.parent.removeChild(bigger);
+        smaller.next = bigger.next;
+        if (smaller.hasNext())
+            smaller.next.previous = smaller;
+
+        // fixing parent
+        InternalNode parent = smaller.parent;
+        fixUnderfeeding(parent, deleted);
+    }
+
+    private void merge(InternalNode smaller, InternalNode bigger){
+
+        int keyIndex = bigger.parent.childNum(bigger)-1;
+        K fromParent = bigger.parent.removeChild(keyIndex+1);
+
+        smaller.keys.add(fromParent);
+        smaller.keys.addAll(bigger.keys);
+        for (Node child : bigger.pointers)
+            child.parent = smaller;
+        smaller.pointers.addAll(bigger.pointers);
+        smaller.size += 1+bigger.size;
+
+        // fixing parent
+        InternalNode parent = smaller.parent;
+        fixUnderfeeding(parent, fromParent);
     }
 
     private LeafNode getLeaf(K key){
@@ -170,13 +331,34 @@ public class BPlusTree<K extends Comparable<K>, V> {
         }
     }
 
-    private class Node {
+    private abstract class Node {
         InternalNode parent;
+        int size;
+
+        public boolean isFull(){
+            return this.size >= maxChildren-1;
+        }
+        public boolean isOverfed(){
+            return this.size+1 > maxChildren;
+        }
+        public boolean isUnderfed(){
+            if (this.equals(root))
+                return this.size == 0;
+            return this.size < (maxChildren-1)/2;
+        }
+        public boolean hasSpareEntries(){
+            return this.size > (maxChildren-1)/2;
+        }
+
+        abstract public Node next();
+        abstract public Node previous();
+
+        public boolean hasNext(){ return this.next() != null; }
+        public boolean hasPrevious(){ return this.previous() != null; }
     }
 
     private class InternalNode extends Node {
         List<K> keys;
-        int size;
         List<Node> pointers;
 
         public InternalNode(List<K> keys, List<Node> pointers, InternalNode parent) {
@@ -188,6 +370,44 @@ public class BPlusTree<K extends Comparable<K>, V> {
             this.parent = parent;
         }
 
+        public int childNum(Node node){
+            return this.pointers.indexOf(node);
+        }
+
+        public K removeChild(Node node){
+            return removeChild(this.pointers.indexOf(node));
+        }
+
+        public K removeChild(int pos){
+            this.size--;
+            this.pointers.remove(pos);
+            if (pos > 0)
+                return this.keys.remove(pos-1);
+            else
+                return this.keys.remove(0);
+        }
+
+        public InternalNode next(){
+            if (this.parent == null)
+                return null;
+
+            int index = this.parent.pointers.indexOf(this);
+            if (index+1 == this.parent.pointers.size())
+                return null;
+            return (InternalNode) this.parent.pointers.get(index+1);
+        }
+
+        public InternalNode previous(){
+            if (this.parent == null)
+                return null;
+
+            int index = this.parent.pointers.indexOf(this);
+            if (index-1 < 0)
+                return null;
+            return (InternalNode) this.parent.pointers.get(index-1);
+        }
+
+
         @Override
         public String toString() {
             return "InternalNode{" +
@@ -198,7 +418,6 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
     private class LeafNode extends Node{
         List<Pair> pairs;
-        int size;
         LeafNode previous, next;
 
         public LeafNode(List<Pair> pairs, InternalNode parent, LeafNode previous, LeafNode next) {
@@ -209,11 +428,71 @@ public class BPlusTree<K extends Comparable<K>, V> {
             this.parent = parent;
         }
 
+        public void addEntry(K key, V value){
+            insertSorted(this.pairs, key, value);
+            this.size++;
+        }
+
+        public void addEntry(Pair pair){
+            insertSorted(this.pairs, pair);
+            this.size++;
+        }
+
+        public void addEntries(int pos, Collection<? extends Pair> pairs){
+            this.pairs.addAll(pos, pairs);
+            this.size += pairs.size();
+        }
+
+        public int keyPos(K key){
+            for (int i = 0; i < this.pairs.size(); i++) {
+                if (this.pairs.get(i).key.compareTo(key) == 0)
+                    return i;
+            }
+            throw new IllegalArgumentException("Key is not present");
+        }
+
+        public K inorderSuccessor(K key){
+            int index = this.keyPos(key);
+            if (index < this.size-1)
+                return this.pairs.get(index+1).key;
+
+            LeafNode next = this.next();
+            while (next != null && next.size == 0)
+                next = next.next();
+
+            if (next == null)
+                return null;
+
+            return next.pairs.get(0).key;
+        }
+
+        public int removeEntry(K key){
+            this.size--;
+            int index = this.keyPos(key);
+            this.pairs.remove(index);
+            return index;
+        }
+
+        public Pair removeAt(int index){
+            this.size--;
+            return this.pairs.remove(index);
+        }
+
         @Override
         public String toString() {
             return "LeafNode{" +
                      pairs +
                     '}';
+        }
+
+        @Override
+        public LeafNode next() {
+            return this.next;
+        }
+
+        @Override
+        public LeafNode previous() {
+            return this.previous;
         }
     }
 
