@@ -174,8 +174,8 @@ public class BPlusTree<K extends Comparable<K>, V> {
     private void stealFromNext(LeafNode node, K deleting){
         Pair toMove = node.next.removeAt(0);
         node.addEntry(toMove);
-        replacePropagate(node.parent, deleting, toMove.key);
         node.parent.keys.set(Collections.binarySearch(node.parent.keys, toMove.key), node.next.pairs.get(0).key);
+        replacePropagate(node.parent, deleting, toMove.key);
     }
 
     private void stealFromNext(InternalNode node, K deleting){
@@ -290,19 +290,20 @@ public class BPlusTree<K extends Comparable<K>, V> {
     }
 
     public void print(){
-        Node c = this.root;
-        while (c.getClass().equals(InternalNode.class)){
-            c = ((InternalNode) c).pointers.get(0);
-        }
-        LeafNode l = (LeafNode) c;
-        while (l != null){
-            System.out.print("| ");
-            for (Pair p : l.pairs) {
-                System.out.print(p.key + ",");
-            }
-            System.out.print(" |");
-            l = l.next;
-        }
+        System.out.print(root.asStringTree());
+//        Node c = this.root;
+//        while (c.getClass().equals(InternalNode.class)){
+//            c = ((InternalNode) c).pointers.get(0);
+//        }
+//        LeafNode l = (LeafNode) c;
+//        while (l != null){
+//            System.out.print("| ");
+//            for (Pair p : l.pairs) {
+//                System.out.print(p.key + ",");
+//            }
+//            System.out.print(" |");
+//            l = l.next;
+//        }
     }
 
 
@@ -353,6 +354,8 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
         abstract public Node next();
         abstract public Node previous();
+        abstract public String asStringTree();
+        abstract public void printTreeToBuffer(StringBuilder buffer, String prefix, String childrenPrefix);
 
         public boolean hasNext(){ return this.next() != null; }
         public boolean hasPrevious(){ return this.previous() != null; }
@@ -415,6 +418,28 @@ public class BPlusTree<K extends Comparable<K>, V> {
                     "" + keys +
                     '}';
         }
+
+        public String asStringTree() {
+            StringBuilder buffer = new StringBuilder(50);
+            printTreeToBuffer(buffer, "", "");
+            return buffer.toString();
+        }
+
+        public void printTreeToBuffer(StringBuilder buffer, String prefix, String childrenPrefix) {
+            buffer.append(prefix);
+            for (K key : this.keys)
+                buffer.append(key.toString()).append(", ");
+            buffer.append('\n');
+            for (Iterator<Node> it = this.pointers.iterator(); it.hasNext();) {
+                Node next = it.next();
+                if (it.hasNext()) {
+                    next.printTreeToBuffer(buffer, childrenPrefix + "├── ", childrenPrefix + "│   ");
+                } else {
+                    next.printTreeToBuffer(buffer, childrenPrefix + "└── ", childrenPrefix + "    ");
+                }
+            }
+        }
+
     }
 
     private class LeafNode extends Node{
@@ -495,6 +520,20 @@ public class BPlusTree<K extends Comparable<K>, V> {
         public LeafNode previous() {
             return this.previous;
         }
+
+        public String asStringTree() {
+            StringBuilder buffer = new StringBuilder(50);
+            printTreeToBuffer(buffer, "", "");
+            return buffer.toString();
+        }
+
+        public void printTreeToBuffer(StringBuilder buffer, String prefix, String childrenPrefix) {
+            buffer.append(prefix);
+            for (Pair pair : this.pairs)
+                buffer.append("<").append(pair.key).append("-").append(pair.value).append(">, ");
+            buffer.append('\n');
+        }
+
     }
 
 }
