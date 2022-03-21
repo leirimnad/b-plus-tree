@@ -102,6 +102,8 @@ public class BPlusTree<K extends Comparable<K>, V> {
         node.pairs = new ArrayList<>(node.pairs.subList(0, toLeft));
         node.size = toLeft;
         node.next = newRight;
+        if (newRight.hasNext())
+            newRight.next.previous = newRight;
 
         pushToParent(node, splitKey, newRight);
     }
@@ -244,7 +246,7 @@ public class BPlusTree<K extends Comparable<K>, V> {
         // fixing parent
         InternalNode parent = smaller.parent;
         replacePropagate(smaller.parent, leafKey, inorderSuccessor);
-        fixUnderfeeding(parent, deleted);
+        fixUnderfeeding(parent, leafKey);
     }
 
     private void merge(InternalNode smaller, InternalNode bigger){

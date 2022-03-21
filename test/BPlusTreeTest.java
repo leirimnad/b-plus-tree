@@ -14,6 +14,7 @@ public class BPlusTreeTest {
         tree.insert(425, "Salads");
         tree.insert(145, "Salads");
         tree.insert(2, "Salads");
+        tree.print();
         tree.insert(11, "Salads");
         tree.insert(30, "Salt");
         tree.print();
