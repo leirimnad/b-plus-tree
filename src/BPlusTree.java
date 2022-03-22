@@ -50,6 +50,11 @@ public class BPlusTree<K extends Comparable<K>, V> {
             return;
         }
 
+        if (node.equals(this.root)) {
+            this.root = null;
+            return;
+        }
+
         // try to steal
         if (node.hasNext() && node.parent.equals(node.next().parent) && node.next().hasSpareEntries())
             stealFromNext(node, deleting);
@@ -86,10 +91,10 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
         // else merge
         else {
-            if (next != null)
-                merge(node, next);
-            else if (previous != null)
+            if (previous != null)
                 merge(previous, node);
+            else if (next != null)
+                merge(node, next);
             else
                 throw new RuntimeException("Node has no previous and no next");
         }
@@ -216,7 +221,7 @@ public class BPlusTree<K extends Comparable<K>, V> {
         K fromParent = node.parent.keys.get(keyNum);
 
         K stolenKey = previous.keys.remove(previous.size-1);
-        Node stolenChild = previous.pointers.remove(previous.size-1);
+        Node stolenChild = previous.pointers.remove(previous.size);
         previous.size--;
 
         node.parent.keys.set(keyNum, stolenKey);
@@ -238,7 +243,7 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
     private void merge(LeafNode smaller, LeafNode bigger, K leafKey, K inorderSuccessor){
         smaller.addEntries(smaller.pairs.size(), bigger.pairs);
-        K deleted = bigger.parent.removeChild(bigger);
+        bigger.parent.removeChild(bigger);
         smaller.next = bigger.next;
         if (smaller.hasNext())
             smaller.next.previous = smaller;
@@ -292,20 +297,11 @@ public class BPlusTree<K extends Comparable<K>, V> {
     }
 
     public void print(){
+        if (this.root == null){
+            System.out.println("<Empty tree>");
+            return;
+        }
         System.out.print(root.asStringTree());
-//        Node c = this.root;
-//        while (c.getClass().equals(InternalNode.class)){
-//            c = ((InternalNode) c).pointers.get(0);
-//        }
-//        LeafNode l = (LeafNode) c;
-//        while (l != null){
-//            System.out.print("| ");
-//            for (Pair p : l.pairs) {
-//                System.out.print(p.key + ",");
-//            }
-//            System.out.print(" |");
-//            l = l.next;
-//        }
     }
 
 
@@ -339,9 +335,6 @@ public class BPlusTree<K extends Comparable<K>, V> {
         InternalNode parent;
         int size;
 
-        public boolean isFull(){
-            return this.size >= maxChildren-1;
-        }
         public boolean isOverfed(){
             return this.size+1 > maxChildren;
         }
@@ -494,11 +487,10 @@ public class BPlusTree<K extends Comparable<K>, V> {
             return next.pairs.get(0).key;
         }
 
-        public int removeEntry(K key){
+        public void removeEntry(K key){
             this.size--;
             int index = this.keyPos(key);
             this.pairs.remove(index);
-            return index;
         }
 
         public Pair removeAt(int index){
