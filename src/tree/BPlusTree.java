@@ -38,6 +38,8 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
     public void delete(K key){
         LeafNode leaf = getLeaf(key);
+        if (leaf == null || !leaf.contains(key))
+            throw new IllegalArgumentException("Key is not present");
 
         K inorderSuccessor = leaf.inorderSuccessor(key);
         leaf.removeEntry(key);
@@ -46,14 +48,14 @@ public class BPlusTree<K extends Comparable<K>, V> {
     }
 
     private void fixUnderfeeding(LeafNode node, K deleting, K inorderSuccessor){
-        if (!node.isUnderfed()) {
-            if (inorderSuccessor != null)
-                replacePropagate(node.parent, deleting, inorderSuccessor);
+        if (node.equals(this.root) && node.isUnderfed()) {
+            this.root = null;
             return;
         }
 
-        if (node.equals(this.root)) {
-            this.root = null;
+        if (!node.isUnderfed()) {
+            if (inorderSuccessor != null && node.parent != null)
+                replacePropagate(node.parent, deleting, inorderSuccessor);
             return;
         }
 
@@ -274,6 +276,9 @@ public class BPlusTree<K extends Comparable<K>, V> {
     }
 
     private LeafNode getLeaf(K key){
+        if (this.root == null)
+            return null;
+
         if (root.getClass().equals(LeafNode.class))
             return (LeafNode) root;
 
@@ -472,6 +477,10 @@ public class BPlusTree<K extends Comparable<K>, V> {
                     return i;
             }
             throw new IllegalArgumentException("Key is not present");
+        }
+
+        public boolean contains(K key){
+            return this.pairs.stream().anyMatch(p -> p.key.compareTo(key) == 0);
         }
 
         public K inorderSuccessor(K key){
