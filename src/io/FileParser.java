@@ -1,11 +1,11 @@
 package io;
 
 import tree.BPlusTree;
+import util.RationalNumber;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.SecureRandom;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public class FileParser {
     static final List<String> acceptedCommands = List.of("P", "I", "DR", "D", "IR", "G");
 
-    public static void runFile(String fileName, BPlusTree<Integer, String> tree){
+    public static void runFile(String fileName, BPlusTree<RationalNumber, String> tree){
         try {
             List<Command> commands = getCommands(fileName);
             for (Command c :
@@ -22,14 +22,13 @@ public class FileParser {
             }
         } catch (IOException e) {
             e.printStackTrace();
-            return;
         }
 
     }
 
-    public static BPlusTree<Integer, String> runFile(String fileName){
+    public static BPlusTree<RationalNumber, String> runFile(String fileName){
         Path filePath = Path.of(fileName);
-        BPlusTree<Integer, String> tree;
+        BPlusTree<RationalNumber, String> tree;
         try {
             BufferedReader br = new BufferedReader(new FileReader(filePath.toFile()));
             String firstLine = br.readLine();
@@ -56,7 +55,9 @@ public class FileParser {
         Path filePath = Path.of(fileName);
         String file = Files.readString(filePath);
         List<Command> allMatches = new ArrayList<>();
-        Matcher m = Pattern.compile("^("+String.join("|", acceptedCommands)+")(( -?\\d+)( .+)?)?$", Pattern.MULTILINE)
+        Matcher m = Pattern.compile(
+                "^("+String.join("|", acceptedCommands)+")(( -?\\d+/\\d+)( .+)?)?$"
+                        , Pattern.MULTILINE)
                 .matcher(file);
         while (m.find()) {
             UncheckedCommand uncheckedCommand = new UncheckedCommand(m.group(1), m.group(3), m.group(4));
@@ -68,7 +69,7 @@ public class FileParser {
 
     private static class UncheckedCommand {
         private final String commandSymbol;
-        private final Optional<Integer> key;
+        private final Optional<RationalNumber> key;
         private final Optional<String> value;
 
 
@@ -76,7 +77,7 @@ public class FileParser {
             this.commandSymbol = commandSymbolGroup;
 
             if (keyGroup != null)
-                this.key = Optional.of(Integer.parseInt(keyGroup.substring(1)));
+                this.key = Optional.of(RationalNumber.fromString(keyGroup.substring(1)));
             else this.key = Optional.empty();
 
             if (valueGroup != null)
@@ -93,9 +94,9 @@ public class FileParser {
                 return false;
             if (Objects.equals(commandSymbol, "D") && (key.isEmpty() || value.isPresent()))
                 return false;
-            if (Objects.equals(commandSymbol, "IR") && (key.isEmpty() || key.get() < 0))
+            if (Objects.equals(commandSymbol, "IR") && (key.isEmpty() || !key.get().isNotNegative()))
                 return false;
-            if (Objects.equals(commandSymbol, "DR") && (key.isEmpty() || key.get() < 0 || value.isPresent()))
+            if (Objects.equals(commandSymbol, "DR") && (key.isPresent() || value.isEmpty() || value.get().matches("\\d+")))
                 return false;
             if (Objects.equals(commandSymbol, "G") && (key.isEmpty() || value.isPresent()))
                 return false;
@@ -108,17 +109,17 @@ public class FileParser {
     }
 
     public static class Command{
-        private String commandSymbol;
-        private Optional<Integer> key;
-        private Optional<String> value;
+        private final String commandSymbol;
+        private final Optional<RationalNumber> key;
+        private final Optional<String> value;
 
-        public Command(String commandSymbol, Optional<Integer> key, Optional<String> value) {
+        public Command(String commandSymbol, Optional<RationalNumber> key, Optional<String> value) {
             this.commandSymbol = commandSymbol;
             this.key = key;
             this.value = value;
         }
 
-        public void run(BPlusTree<Integer, String> tree){
+        public void run(BPlusTree<RationalNumber, String> tree){
             if (commandSymbol.equals("P"))
                 tree.print();
             if (commandSymbol.equals("I"))
@@ -128,19 +129,17 @@ public class FileParser {
             if (commandSymbol.equals("G"))
                 System.out.println(tree.get(key.get()));
             if (commandSymbol.equals("IR")) {
-                int needed = key.orElse(0);
-                int max = 10000;
-                if (value.isPresent() && value.get().matches("\\d+"))
-                    max = Integer.parseInt(value.get());
+                int needed = key.get().getNumerator();
+                int max = key.get().getDenominator();
 
-                List<Integer> numbers = new ArrayList<>();
+                List<RationalNumber> numbers = new ArrayList<>();
                 for (int i = 0; i < max; i++)
-                    numbers.add(i);
+                    numbers.add(new RationalNumber(i, 1));
                 Collections.shuffle(numbers);
 
                 int added = 0;
                 while (added < needed && !numbers.isEmpty()) {
-                    int num = numbers.remove(0);
+                    RationalNumber num = numbers.remove(0);
                     if (!tree.contains(num)) {
                         tree.insert(num, "R");
                         added++;
@@ -148,8 +147,8 @@ public class FileParser {
                 }
             }
             if (commandSymbol.equals("DR")) {
-                int needed = key.orElse(0);
-                List<Integer> keys = tree.getKeys();
+                int needed = Integer.parseInt(value.get());
+                List<RationalNumber> keys = tree.getKeys();
                 Collections.shuffle(keys);
                 while (needed > 0 && !keys.isEmpty()){
                     tree.delete(keys.remove(0));

@@ -1,11 +1,11 @@
 BRANCHING FACTOR 4
-I 10 Red
-I -10 Black
-I 30 Yellow
-I 20 Orange
-I 70 Violet
-I 40 Green
-I 50 Light blue
-I 60 Blue
-D -10
+I 1/7 Red
+I -1/7 Black
+I 3/7 Yellow
+I 2/7 Orange
+I 7/7 Violet
+I 4/7 Green
+I 5/7 Light blue
+I 6/7 Blue
+D -1/7
 P
