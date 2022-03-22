@@ -14,11 +14,20 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
     public V get(K key){
         LeafNode leaf = this.getLeaf(key);
+        if (leaf == null)
+            return null;
         for (int i = 0; i < leaf.size; i++) {
             if (leaf.pairs.get(i).key.compareTo(key) == 0)
                 return leaf.pairs.get(i).value;
         }
         return null;
+    }
+
+    public boolean contains(K key) {
+        LeafNode leaf = this.getLeaf(key);
+        if (leaf == null)
+            return false;
+        return leaf.contains(key);
     }
 
     public void insert(K key, V value){
@@ -29,6 +38,9 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
         LeafNode leaf = this.getLeaf(key);
 
+        if (leaf.contains(key))
+            throw new IllegalArgumentException("Key "+key+" is already present in the tree");
+
         leaf.addEntry(key, value);
 
         if (leaf.isOverfed())
@@ -37,9 +49,10 @@ public class BPlusTree<K extends Comparable<K>, V> {
     }
 
     public void delete(K key){
+
         LeafNode leaf = getLeaf(key);
         if (leaf == null || !leaf.contains(key))
-            throw new IllegalArgumentException("Key is not present");
+            throw new IllegalArgumentException("Key "+key+" is not present");
 
         K inorderSuccessor = leaf.inorderSuccessor(key);
         leaf.removeEntry(key);
@@ -61,9 +74,9 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
         // try to steal
         if (node.hasNext() && node.parent.equals(node.next().parent) && node.next().hasSpareEntries())
-            stealFromNext(node, deleting);
+            stealFromNext(node, deleting, inorderSuccessor);
         else if (node.hasPrevious() && node.parent.equals(node.previous().parent) && node.previous().hasSpareEntries())
-            stealFromPrevious(node, deleting);
+            stealFromPrevious(node, deleting, inorderSuccessor);
 
         // else merge
         else {
@@ -182,11 +195,12 @@ public class BPlusTree<K extends Comparable<K>, V> {
         list.add(index, pair);
     }
 
-    private void stealFromNext(LeafNode node, K deleting){
+    private void stealFromNext(LeafNode node, K deleting, K inorderSuccessor){
         Pair toMove = node.next.removeAt(0);
         node.addEntry(toMove);
-        node.parent.keys.set(Collections.binarySearch(node.parent.keys, toMove.key), node.next.pairs.get(0).key);
-        replacePropagate(node.parent, deleting, toMove.key);
+        node.parent.changeKeyForChild(node.next, node.next.pairs.get(0).key);
+        node.parent.changeKeyForChild(node, node.pairs.get(0).key);
+        replacePropagate(node.parent, deleting, inorderSuccessor);
     }
 
     private void stealFromNext(InternalNode node, K deleting){
@@ -210,10 +224,11 @@ public class BPlusTree<K extends Comparable<K>, V> {
         replacePropagate(node.parent, deleting, stolenKey);
     }
 
-    private void stealFromPrevious(LeafNode node, K deleting){
+    private void stealFromPrevious(LeafNode node, K deleting, K inorderSuccessor){
         Pair toMove = node.previous.removeAt(node.previous.pairs.size()-1);
         node.addEntry(toMove);
-        replacePropagate(node.parent, deleting, toMove.key);
+        node.parent.changeKeyForChild(node, toMove.key);
+        replacePropagate(node.parent, deleting, inorderSuccessor);
     }
 
     private void stealFromPrevious(InternalNode node, K deleting){
@@ -303,6 +318,42 @@ public class BPlusTree<K extends Comparable<K>, V> {
         }
     }
 
+    public List<V> getValues(){
+        List<V> res = new ArrayList<>();
+        LeafNode l = this.getMinimalLeaf();
+        if (l == null)
+            return res;
+
+        while (l != null){
+            for (Pair p : l.pairs)
+                res.add(p.value);
+            l = l.next();
+        }
+        return res;
+    }
+
+    public List<K> getKeys(){
+        List<K> res = new ArrayList<>();
+        LeafNode l = this.getMinimalLeaf();
+        if (l == null)
+            return res;
+        while (l != null){
+            for (Pair p : l.pairs)
+                res.add(p.key);
+            l = l.next();
+        }
+        return res;
+    }
+
+    private LeafNode getMinimalLeaf(){
+        Node c = this.root;
+        if (c == null)
+            return null;
+        while (c.getClass().equals(InternalNode.class))
+            c = ((InternalNode) c).pointers.get(0);
+        return (LeafNode) c;
+    }
+
     public void print(){
         if (this.root == null){
             System.out.println("<Empty tree>");
@@ -310,6 +361,8 @@ public class BPlusTree<K extends Comparable<K>, V> {
         }
         System.out.print(root.asStringTree());
     }
+
+
 
 
     // Classes
@@ -393,6 +446,12 @@ public class BPlusTree<K extends Comparable<K>, V> {
                 return this.keys.remove(0);
         }
 
+        public void changeKeyForChild(Node child, K newKey){
+            int keyIndex = this.childNum(child)-1;
+            if (keyIndex >= 0)
+                this.keys.set(keyIndex, newKey);
+        }
+
         public InternalNode next(){
             if (this.parent == null)
                 return null;
@@ -429,8 +488,8 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
         public void printTreeToBuffer(StringBuilder buffer, String prefix, String childrenPrefix) {
             buffer.append(prefix);
-            for (K key : this.keys)
-                buffer.append(key.toString()).append(", ");
+            List<String> keyStrings = keys.stream().map(Object::toString).collect(Collectors.toList());
+            buffer.append(String.join(", ", keyStrings));
             buffer.append('\n');
             for (Iterator<Node> it = this.pointers.iterator(); it.hasNext();) {
                 Node next = it.next();
@@ -534,8 +593,10 @@ public class BPlusTree<K extends Comparable<K>, V> {
 
         public void printTreeToBuffer(StringBuilder buffer, String prefix, String childrenPrefix) {
             buffer.append(prefix);
-            for (Pair pair : this.pairs)
-                buffer.append("<").append(pair.key).append("-").append(pair.value).append(">, ");
+            List<String> pairStrings = this.pairs.stream()
+                    .map(s -> "<"+s.key.toString()+"-"+s.value.toString()+">")
+                    .collect(Collectors.toList());
+            buffer.append(String.join(", ", pairStrings));
             buffer.append('\n');
         }
 

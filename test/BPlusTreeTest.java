@@ -2,29 +2,36 @@ import tree.BPlusTree;
 
 public class BPlusTreeTest {
     public static void main(String[] args) {
-        BPlusTree<Integer, String> tree = new BPlusTree<>(3);
+        BPlusTree<Integer, String> tree = new BPlusTree<>(5);
+        tree.insert(1, "Cakes");
+        tree.insert(6, "Chocolates");
+        tree.insert(9, "Fruits");
+        tree.insert(14, "Salt food");
+        tree.insert(7, "Salt");
+        tree.insert(2, "Soups");
+        tree.insert(8, "Cakes");
+        tree.insert(12, "Cakes");
+        tree.insert(13, "Cakes");
+        tree.insert(3, "Cakes");
+        tree.insert(10, "Cakes");
+        tree.insert(0, "Cakes");
+        tree.insert(4, "Cakes");
         tree.insert(5, "Cakes");
-        tree.insert(15, "Chocolates");
-        tree.insert(20, "Fruits");
-        tree.insert(25, "Salt food");
-        tree.insert(30, "Salt");
-        tree.insert(35, "Soups");
-        tree.insert(40, "Salads");
-        tree.insert(45, "Salads");
-        tree.insert(55, "Salads");
+        tree.insert(11, "Cakes");
 
-        tree.delete(40);
-        tree.delete(45);
-        tree.delete(35);
-        tree.delete(20);
-        tree.delete(30);
-        tree.delete(55);
-        tree.delete(15);
-        tree.delete(25);
-        tree.delete(5);
-        tree.insert(1, "RRR");
-        tree.insert(2, "RRR");
-        tree.insert(3, "RRR");
+        tree.delete(4);
         tree.print();
+
+        tree.delete(7);
+        tree.print();
+
+        tree.delete(12);
+        tree.print();
+
+        tree.delete(1);
+        tree.delete(8);
+
+        tree.print();
+
     }
 }

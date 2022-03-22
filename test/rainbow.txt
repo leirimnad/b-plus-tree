@@ -1,0 +1,11 @@
+BRANCHING FACTOR 4
+I 10 Red
+I -10 Black
+I 30 Yellow
+I 20 Orange
+I 70 Violet
+I 40 Green
+I 50 Light blue
+I 60 Blue
+D -10
+P
